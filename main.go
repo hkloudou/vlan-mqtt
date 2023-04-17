@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/hkloudou/xtransport"
 	"github.com/hkloudou/xtransport/packets/mqtt"
 	transport "github.com/hkloudou/xtransport/transports/tcp"
-	"github.com/songgao/water"
 	"github.com/songgao/water/waterutil"
 )
 
@@ -33,6 +31,7 @@ func main() {
 		Usage:    "mqtt server",
 	})
 	app.Action = func(ctx *xflag.Context) error {
+		f, err := initIface(ctx.Int("vid"))
 		tran := transport.NewTransport("tcp", xtransport.Secure(false))
 		cli, err := tran.Dial(ctx.String("mqtt"), xtransport.WithTimeout(5*time.Second))
 		if err != nil {
@@ -56,49 +55,22 @@ func main() {
 		if err != nil {
 			log.Panicln(xcolor.Red("Send"), err)
 		}
-		// create a TAP interface
-		config := water.Config{
-			DeviceType: water.TAP,
-		}
-		config.Name = fmt.Sprintf("vnats%d", ctx.Int("vid"))
-		ifce, err := water.New(config)
-		if err != nil {
-			return err
-		}
-		// get ethernet address of the interface we just created
-		var ownEth net.HardwareAddr
-		nifces, err := net.Interfaces()
-		if err != nil {
-			return err
-		}
-		for _, nifce := range nifces {
-			if nifce.Name == config.Name {
-				ownEth = nifce.HardwareAddr
-				break
-			}
-		}
-		if len(ownEth) == 0 {
-			log.Fatal("failed to get own ethernet address")
-		}
 
-		//config
-		broadcastTopic := fmt.Sprintf("vvvv.xxxx.%d", ctx.Int("vid"))
-		ethTopic := fmt.Sprintf("vvvv.xxxx.%d.%x", ctx.Int("vid"), ownEth)
 		go func() {
 			var frame [1500]byte
 			for {
 				// read frame from interface
-				n, err := ifce.Read(frame[:])
+				n, err := f.Face.Read(frame[:])
 				if err != nil {
 					log.Fatal(err)
 				}
 				frame2 := frame[:n]
-
 				// the topic to publish to
 				dst := waterutil.MACDestination(frame2)
+				log.Println(xcolor.Green("DD"), fmt.Sprintf("%x=>%x", waterutil.MACSource(frame2), waterutil.MACDestination(frame2)))
 				var pubTopic string
 				if waterutil.IsBroadcast(dst) {
-					pubTopic = broadcastTopic
+					pubTopic = f.BroadcastTopic
 				} else {
 					pubTopic = fmt.Sprintf("vvvv.xxxx.%d.%x", ctx.Int("vid"), dst)
 				}
@@ -133,10 +105,8 @@ func main() {
 			case mqtt.Publish:
 				// request.(mqtt.PublishPacket).Payload
 				req := request.(mqtt.PublishPacket)
-				// // if
-				// ifce.Write(re)
-				if req.TopicName == broadcastTopic || req.TopicName == ethTopic {
-					_, err := ifce.Write(req.Payload)
+				if f.IsTopic(req.TopicName) {
+					_, err := f.Face.Write(req.Payload)
 					if err != nil {
 						log.Println(xcolor.Red("PUB"), request)
 						break
@@ -148,7 +118,7 @@ func main() {
 			case mqtt.Connack:
 				//连接成功
 				sub := mqtt.NewControlPacket(mqtt.Subscribe).(*mqtt.SubscribePacket)
-				sub.Topics = []string{broadcastTopic, ethTopic}
+				sub.Topics = []string{f.BroadcastTopic, f.EthTopic}
 				sub.Qoss = []byte{0, 0}
 				if err := cli.Send(sub); err != nil {
 					log.Println(xcolor.Red("SUB"), request)
