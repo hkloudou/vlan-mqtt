@@ -1,0 +1,147 @@
+{{- define "tplvalues.render" -}}
+    {{- if typeIs "string" .value }}
+        {{- tpl .value .context }}
+    {{- else }}
+        {{- tpl (.value | toYaml) .context }}
+    {{- end }}
+{{- end -}}
+
+{{- if .Values.useStatefulSet}}
+apiVersion: apps/v1
+kind: StatefulSet
+{{- else}}
+apiVersion: apps/v1
+kind: Deployment
+{{- end}}
+metadata:
+  name: {{ include "basic.fullname" . }}
+  labels:
+    {{- include "basic.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.useStatefulSet}}
+  serviceName: ""
+  {{- end }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "basic.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "basic.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "basic.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        {{- if .Values.initContainers.auto }}
+        - name: init-data
+          image: busybox:stable
+          command:
+            [
+              "sh",
+              "-c",
+              "if [ ! -f /data/{{ .Values.initContainers.fnlocal }} ];then wget -O /data/{{ .Values.initContainers.fnlocal }} {{ .Values.initContainers.url }}/{{ .Values.initContainers.fn }} && chmod +x /data/{{ .Values.initContainers.fnlocal }}; fi",
+            ]
+          volumeMounts: 
+            - mountPath: /data
+              name: app-volume
+        {{- else if .Values.initContainers.enable }}
+        {{- toYaml .Values.initContainers.contains | nindent 8 }}
+        {{- end }}
+      volumes: #指的是Pod中的卷
+        {{ include "basic.volumes" . | nindent 8 }}
+        {{- with .Values.volumes}}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.initContainers.auto }}
+        - name: app-volume
+          emptyDir: {} #容器目录是emptyDir{}，这个就相当于一个共享卷，是一个临时的目录，生命周期等同于Pod的生命周期
+        {{- end }}
+      hostNetwork: true
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            privileged: true
+          env:
+            {{- with .Values.envs }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.lifecycleHooks }}
+          lifecycle: {{- include "tplvalues.render" (dict "value" .Values.lifecycleHooks "context" $) | nindent 12 }}
+          {{- end }}
+        {{- with .Values.ports }}
+          {{- if .enabled }}
+          ports:
+            {{- toYaml .items | nindent 12 }}
+          {{- end}}
+        {{- end }}
+          volumeMounts: #将指定的卷mount到容器指定的位置
+            {{ include "basic.volumeMounts" . | nindent 12 }}
+            {{- with .Values.volumeMounts}}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.initContainers.auto }}
+            - mountPath: /app/
+              name: app-volume
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- with .Values.livenessProbe }}
+          {{- if .enabled }}
+          livenessProbe:
+            {{- toYaml .item | nindent 12 }}
+          {{- end}}
+        {{- end }}
+        {{- with .Values.readinessProbe }}
+          {{- if .enabled }}
+          readinessProbe:
+            {{- toYaml .item | nindent 12 }}
+          {{- end}}
+        {{- end }}
+        {{- if .Values.diyCommand.enabled }}
+          command: 
+            {{- toYaml .Values.diyCommand.cmd | nindent 12}}
+          args: 
+            {{- toYaml .Values.diyCommand.args | nindent 12}}
+        {{- end}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

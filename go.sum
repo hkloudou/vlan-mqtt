@@ -6,5 +6,9 @@ github.com/hkloudou/xtransport/packets/mqtt v1.1.3 h1:AaQsxG8zJSa4EBYqd4YZ37tzel
 github.com/hkloudou/xtransport/packets/mqtt v1.1.3/go.mod h1:qwgxPPcqjy+6oZi22V78La3TEtsMUIt0LwA+M0Pwtlk=
 github.com/hkloudou/xtransport/transports/tcp v1.0.3 h1:MqpgBe4sF3yRUK+PwoeHUP5wm4y0n/RvkXmVar/0v/Y=
 github.com/hkloudou/xtransport/transports/tcp v1.0.3/go.mod h1:vJyxswNmTNbefRUP8mFtWk6498YGc8k7enGZLLOPKu4=
+github.com/seancfoley/bintree v1.2.1 h1:Z/iNjRKkXnn0CTW7jDQYtjW5fz2GH1yWvOTJ4MrMvdo=
+github.com/seancfoley/bintree v1.2.1/go.mod h1:hIUabL8OFYyFVTQ6azeajbopogQc2l5C/hiXMcemWNU=
+github.com/seancfoley/ipaddress-go v1.5.4 h1:ZdjewWC1J2y5ruQjWHwK6rA1tInWB6mz1ftz6uTm+Uw=
+github.com/seancfoley/ipaddress-go v1.5.4/go.mod h1:fpvVPC+Jso+YEhNcNiww8HQmBgKP8T4T6BTp1SLxxIo=
 github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8 h1:TG/diQgUe0pntT/2D9tmUCz4VNwm9MfrtPr0SU2qSX8=
 github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8/go.mod h1:P5HUIBuIWKbyjl083/loAegFkfbFNx5i2qEP4CNbm7E=

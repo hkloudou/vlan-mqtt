@@ -1,0 +1,10 @@
+service:
+  enabled: false
+ingress:
+  enabled: false
+envs:
+  - name: "XLIB_DEBUG"
+    value: "true"
+diyCommand:
+  enabled: true
+  args: ["--vid","1","--mqtt","broker.emqx.io:1883","-xlib_info"]
